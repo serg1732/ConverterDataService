@@ -1,13 +1,11 @@
 package converter
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"regexp"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -33,25 +31,21 @@ func ConverterYamlToPrometheus(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(errReadYaml)
 	}
 
-	currencies := make(map[string]string)
-
 	isValid := regexp.MustCompile(`^[a-zA-Z0-9_]+$`).MatchString
 
-	for _, couple := range yamlData.Currencies {
+	var labels string
+	if len(yamlData.Currencies) > 0 {
+		labels = fmt.Sprintf("%s=\"%s\"", yamlData.Currencies[0].Name, yamlData.Currencies[0].Value)
+	}
+
+	for i := 1; i < len(yamlData.Currencies); i++ {
+		couple := yamlData.Currencies[i]
 		if !isValid(couple.Name) || !isValid(couple.Value) {
 			log.Fatal("Error! YAML data not correct!")
 		}
-		currencies[couple.Name] = couple.Value
+		labels = fmt.Sprintf("%s, %s=\"%s\"", labels, couple.Name, couple.Value)
 	}
 
-	jsonData, errJson := json.Marshal(currencies)
-
-	if errJson != nil {
-		log.Fatal(errJson)
-	}
-
-	formatedData := fmt.Sprintf("currencies%s", string(jsonData))
-	formatedData = strings.ReplaceAll(formatedData, ":", "=")
-	formatedData = strings.ReplaceAll(formatedData, ",", ", ")
+	formatedData := fmt.Sprintf("currencies{%s}", labels)
 	w.Write([]byte(formatedData))
 }
